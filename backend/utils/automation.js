@@ -15,64 +15,60 @@ const transporter = nodemailer.createTransport({
 
 const generateAndEmail = async (donation) => {
   try {
-    // 1. Load the SVG file as a string
     const svgPath = path.join(__dirname, '../assets/cert.svg');
-    const svgContent = await fs.readFile(svgPath, 'utf-8');
+    const pngPath = path.join(__dirname, '../assets/cert.png');
 
-    // 2. Load into Cheerio to manipulate XML
+    // 1. Read the SVG strictly to find Coordinates (Lightweight text processing)
+    const svgContent = await fs.readFile(svgPath, 'utf-8');
     const $ = cheerio.load(svgContent, { xmlMode: true });
 
-    // --- HELPER: Function to extract coordinates and insert text ---
-    const insertTextAbovePath = (selector, textContent, fontSize = 24) => {
-      const pathElement = $(selector);
+    // Extract ViewBox (to ensure alignment matches the PNG)
+    const viewBox = $('svg').attr('viewBox') || '0 0 800 600'; // Default fallback
+    const [width, height] = viewBox.split(' ').slice(2);
+
+    // Helper to get coordinates
+    const getCoordinates = (selector) => {
+      const d = $(selector).attr('d');
+      if (!d) return { x: 100, y: 100 }; // Fallback if path not found
       
-      if (pathElement.length > 0) {
-        // Get the 'd' attribute (e.g., "M 100 200 L 300 200...")
-        const d = pathElement.attr('d');
-        
-        // Regex to find the starting 'M' coordinates (Move To x y)
-        // Matches "M 150 300" or "M150,300"
-        const match = d.match(/M\s*([\d.]+)[,\s]+([\d.]+)/i);
-
-        if (match) {
-          const x = parseFloat(match[1]);
-          const y = parseFloat(match[2]);
-
-          // Create a text element
-          // y - 15 puts it 15 pixels ABOVE the line
-          const textNode = `
-            <text 
-              x="${x}" 
-              y="${y - 15}" 
-              font-family="Arial, sans-serif" 
-              font-size="${fontSize}" 
-              fill="black" 
-              font-weight="bold"
-            >
-              ${textContent}
-            </text>
-          `;
-
-          // Append the text to the SVG
-          $('svg').append(textNode);
-        }
+      const match = d.match(/M\s*([\d.]+)[,\s]+([\d.]+)/i);
+      if (match) {
+        return { x: parseFloat(match[1]), y: parseFloat(match[2]) };
       }
+      return { x: 100, y: 100 };
     };
 
-    // 3. Insert Data
-    // We assume the paths have classes: .donorName and .donorAmount
-    insertTextAbovePath('.donorName', donation.donorName, 32);
-    insertTextAbovePath('.donorAmount', `$${donation.amount.toFixed(2)}`, 40);
+    // Get coords for Name and Amount
+    const nameCoords = getCoordinates('.donorName');
+    const amountCoords = getCoordinates('.donorAmount');
 
-    // 4. Convert the modified XML string to a Buffer
-    const modifiedSvgBuffer = Buffer.from($.xml());
+    // 2. Create a "Text Overlay" SVG
+    // This is a transparent SVG containing ONLY the text. It is tiny and won't crash the server.
+    const textOverlay = `
+      <svg width="${width}" height="${height}" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg">
+        <style>
+          .text { fill: black; font-family: Arial, sans-serif; font-weight: bold; }
+        </style>
+        
+        <text x="${nameCoords.x}" y="${nameCoords.y - 15}" font-size="32" class="text">
+          ${donation.donorName}
+        </text>
 
-    // 5. Use Sharp to convert SVG Buffer -> PNG Buffer
-    const pngBuffer = await sharp(modifiedSvgBuffer)
-      .png() 
+        <text x="${amountCoords.x}" y="${amountCoords.y - 15}" font-size="40" class="text">
+          $${donation.amount.toFixed(2)}
+        </text>
+      </svg>
+    `;
+
+    // 3. Composite the Text Overlay onto the PNG
+    const finalImageBuffer = await sharp(pngPath)
+      .composite([
+        { input: Buffer.from(textOverlay), top: 0, left: 0 }
+      ])
+      .png()
       .toBuffer();
 
-    // 6. Send Email
+    // 4. Send Email
     await transporter.sendMail({
       from: `"Student Government" <${process.env.GMAIL_EMAIL}>`,
       to: donation.donorEmail,
@@ -86,7 +82,7 @@ const generateAndEmail = async (donation) => {
       attachments: [
         {
           filename: 'Certificate.png',
-          content: pngBuffer
+          content: finalImageBuffer
         }
       ]
     });
