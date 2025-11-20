@@ -132,7 +132,11 @@ def send_email_background(recipient_email, recipient_name, amount, cert_buffer):
             msg.attach(img)
 
         # Send
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 587) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+
             server.login(GMAIL_EMAIL, GMAIL_PASSWORD)
             server.sendmail(GMAIL_EMAIL, recipient_email, msg.as_string())
         
