@@ -2,14 +2,12 @@ const Jimp = require('jimp');
 const nodemailer = require('nodemailer');
 const path = require('path');
 
-// Configure Outlook Transporter
+// Configure GMAIL Transporter
 const transporter = nodemailer.createTransport({
-  host: "smtp.office365.com",
-  port: 587,
-  secure: false, // true for 465, false for other ports
+  host: "gmail",
   auth: {
-    user: process.env.OUTLOOK_EMAIL,
-    pass: process.env.OUTLOOK_PASSWORD // Use App Password if 2FA is on
+    user: process.env.GMAIL_EMAIL,
+    pass: process.env.GMAIL_PASSWORD // Use App Password if 2FA is on
   }
 });
 
@@ -54,7 +52,7 @@ const generateAndEmail = async (donation) => {
 
     // 4. Send Email
     await transporter.sendMail({
-      from: `"Operation: Teddy Bear" <${process.env.OUTLOOK_EMAIL}>`,
+      from: `"Operation: Teddy Bear" <${process.env.GMAIL_EMAIL}>`,
       to: donation.donorEmail,
       subject: "Thank you for your donation to Operation: Teddy Bear!",
       html: `
