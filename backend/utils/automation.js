@@ -52,14 +52,14 @@ const generateAndEmail = async (donation) => {
 
     // 4. Send Email
     await transporter.sendMail({
-      from: `"Operation: Teddy Bear" <${process.env.GMAIL_EMAIL}>`,
+      from: `"Student Government" <${process.env.GMAIL_EMAIL}>`,
       to: donation.donorEmail,
-      subject: "Thank you for your donation to Operation: Teddy Bear!",
+      subject: "🎄 Thank You for Your Christmas Donation! 🎄",
       html: `
-        <h3>Dear ${donation.donorName},</h3>
+        <h3>Dear ${donation.donorName},</h3><br/>
         <p>Thank you so much for your generous donation of <strong>$${donation.amount}</strong>.</p>
-        <p>Attached is your personalized Certificate of Donation for the Masquerade Ball 2025.</p>
-        <p>Warm regards,<br/>The Team</p>
+        <p>Attached is your personalized Certificate of Donation along with our heartfelt wishes for a Merry Christmas!</p>
+        <p>Yours,<br/>The Student Government</p>
       `,
       attachments: [
         {
