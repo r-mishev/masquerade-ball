@@ -106,7 +106,7 @@ def generate_certificate_image(name, amount):
         return None
 
 def send_email_background(recipient_email, recipient_name, amount, cert_buffer):
-    """Sends email using smtplib (Blocking, so runs in thread)."""
+    """Sends email using smtplib with Port 587 (TLS)"""
     try:
         msg = MIMEMultipart()
         msg['Subject'] = "🎄 Thank You for Your Christmas Donation! 🎄"
@@ -131,17 +131,22 @@ def send_email_background(recipient_email, recipient_name, amount, cert_buffer):
             img.add_header('Content-Disposition', 'attachment', filename="Certificate.png")
             msg.attach(img)
 
-        # Send
-        with smtplib.SMTP_SSL("smtp.gmail.com", 587) as server:
-            server.ehlo()
-            server.starttls()
-            server.ehlo()
-
+        smtp_server = "smtp.gmail.com"
+        smtp_port = 587
+        
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.ehlo()       # Identify ourselves
+            server.starttls()   # Encrypt the connection
+            server.ehlo()       # Re-identify as encrypted
+            
             server.login(GMAIL_EMAIL, GMAIL_PASSWORD)
             server.sendmail(GMAIL_EMAIL, recipient_email, msg.as_string())
         
         print(f"📧 Email sent to {recipient_email}")
+
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"❌ Email Error: {e}")
 
 # --- API ROUTES ---
