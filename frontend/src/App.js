@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './App.css'; // Assume basic styling
 
 const API_URL = process.env.NODE_ENV === 'production' 
-  ? "https://masquerade-ball-c5iq.onrender.com/api"
+  ? "https://masquerade-ball-py.onrender.com/api"
   : "http://localhost:5000/api";
 
 function App() {
