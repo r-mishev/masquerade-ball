@@ -84,7 +84,7 @@ function StaffView({ user }) {
           enteredBy: user.loginCode
         })
       });
-
+ 
       if (res.ok) {
         setStatus({ type: 'success', msg: 'Donation logged! Certificate generating...' });
         setFormData({ name: '', email: '', amount: '' });
