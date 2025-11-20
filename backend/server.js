@@ -17,12 +17,22 @@ mongoose.connect(process.env.MONGO_URI)
 // --- SEED ROUTE (Run once to populate users) ---
 app.get('/seed-users', async (req, res) => {
   const users = [
-    { loginCode: 'ADM001', isAdmin: true },
-    { loginCode: 'ADM002', isAdmin: true },
-    { loginCode: 'ADM003', isAdmin: true },
-    { loginCode: 'ADM004', isAdmin: true },
-    { loginCode: 'STF001', isAdmin: false },
-    { loginCode: 'STF002', isAdmin: false },
+    { loginCode: 'maa230', isAdmin: true },
+    { loginCode: 'rmm220', isAdmin: true },
+    { loginCode: 'lsh230', isAdmin: true },
+    { loginCode: 'jmk240', isAdmin: true },
+    { loginCode: 'nso220', isAdmin: false },
+    { loginCode: 'pnz220', isAdmin: false },
+    { loginCode: 'stt230', isAdmin: false },
+    { loginCode: 'nmp230', isAdmin: false },
+    { loginCode: 'ena230', isAdmin: false },
+    { loginCode: 'kns231', isAdmin: false },
+    { loginCode: 'ksd240', isAdmin: false },
+    { loginCode: 'iaf240', isAdmin: false },
+    { loginCode: 'hnm242', isAdmin: false },
+    { loginCode: 'sat240', isAdmin: false },
+    { loginCode: 'bgk250', isAdmin: false },
+    { loginCode: 'olr250', isAdmin: false },
   ];
   try {
     await User.insertMany(users);
