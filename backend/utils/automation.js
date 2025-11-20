@@ -3,13 +3,24 @@ const cheerio = require('cheerio');
 const nodemailer = require('nodemailer');
 const fs = require('fs').promises;
 const path = require('path');
+require('dotenv').config();
 
-// Configure GMAIL Transporter
+// --- GMAIL TRANSPORTER ---
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 587,
+  secure: false,
   auth: {
     user: process.env.GMAIL_EMAIL,
-    pass: process.env.GMAIL_PASSWORD // Use App Password if 2FA is on
+    pass: process.env.GMAIL_PASSWORD,
+  },
+});
+
+transporter.verify((error, success) => {
+  if (error) {
+    console.error('❌ Error connecting to Gmail SMTP:', error);
+  } else {
+    console.log('✅ Gmail SMTP connection is ready to send emails');
   }
 });
 
@@ -18,18 +29,16 @@ const generateAndEmail = async (donation) => {
     const svgPath = path.join(__dirname, '../assets/cert.svg');
     const pngPath = path.join(__dirname, '../assets/cert.png');
 
-    // 1. Read the SVG strictly to find Coordinates (Lightweight text processing)
+    // 1. Read the SVG strictly to find Coordinates
     const svgContent = await fs.readFile(svgPath, 'utf-8');
     const $ = cheerio.load(svgContent, { xmlMode: true });
 
-    // Extract ViewBox (to ensure alignment matches the PNG)
-    const viewBox = $('svg').attr('viewBox') || '0 0 800 600'; // Default fallback
+    const viewBox = $('svg').attr('viewBox') || '0 0 800 600';
     const [width, height] = viewBox.split(' ').slice(2);
 
-    // Helper to get coordinates
     const getCoordinates = (selector) => {
       const d = $(selector).attr('d');
-      if (!d) return { x: 100, y: 100 }; // Fallback if path not found
+      if (!d) return { x: 100, y: 100 };
       
       const match = d.match(/M\s*([\d.]+)[,\s]+([\d.]+)/i);
       if (match) {
@@ -38,12 +47,9 @@ const generateAndEmail = async (donation) => {
       return { x: 100, y: 100 };
     };
 
-    // Get coords for Name and Amount
     const nameCoords = getCoordinates('.donorName');
     const amountCoords = getCoordinates('.donorAmount');
 
-    // 2. Create a "Text Overlay" SVG
-    // This is a transparent SVG containing ONLY the text. It is tiny and won't crash the server.
     const textOverlay = `
       <svg width="${width}" height="${height}" viewBox="${viewBox}" xmlns="http://www.w3.org/2000/svg">
         <style>
@@ -60,16 +66,13 @@ const generateAndEmail = async (donation) => {
       </svg>
     `;
 
-    // 3. Composite the Text Overlay onto the PNG
     const finalImageBuffer = await sharp(pngPath)
-      .composite([
-        { input: Buffer.from(textOverlay), top: 0, left: 0 }
-      ])
+      .composite([{ input: Buffer.from(textOverlay), top: 0, left: 0 }])
       .png()
       .toBuffer();
 
     // 4. Send Email
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: `"Student Government" <${process.env.GMAIL_EMAIL}>`,
       to: donation.donorEmail,
       subject: "🎄 Thank You for Your Christmas Donation! 🎄",
@@ -87,7 +90,7 @@ const generateAndEmail = async (donation) => {
       ]
     });
 
-    console.log(`Certificate sent to ${donation.donorEmail}`);
+    console.log(`✅ Certificate email sent to ${donation.donorEmail}. Message ID: ${info.messageId}`);
 
   } catch (error) {
     console.error("Automation Error:", error);
