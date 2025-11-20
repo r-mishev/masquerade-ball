@@ -1,10 +1,12 @@
-const Jimp = require('jimp');
+const sharp = require('sharp');
+const cheerio = require('cheerio');
 const nodemailer = require('nodemailer');
+const fs = require('fs').promises;
 const path = require('path');
 
 // Configure GMAIL Transporter
 const transporter = nodemailer.createTransport({
-  host: "gmail",
+  service: 'gmail',
   auth: {
     user: process.env.GMAIL_EMAIL,
     pass: process.env.GMAIL_PASSWORD // Use App Password if 2FA is on
@@ -13,44 +15,64 @@ const transporter = nodemailer.createTransport({
 
 const generateAndEmail = async (donation) => {
   try {
-    // 1. Load Image
-    const fontName = await Jimp.loadFont(Jimp.FONT_SANS_32_BLACK); 
-    const fontAmount = await Jimp.loadFont(Jimp.FONT_SANS_64_BLACK); // Larger for amount
-    const image = await Jimp.read(path.join(__dirname, '../assets/Certificate of Donation.png'));
+    // 1. Load the SVG file as a string
+    const svgPath = path.join(__dirname, '../assets/cert.svg');
+    const svgContent = await fs.readFile(svgPath, 'utf-8');
 
-    // 2. Add Text (Adjust X, Y based on image_104a62.png)
-    // Printing Name (Brown Rectangle Area)
-    image.print(
-      fontName, 
-      100, // x-axis (pixels from left)
-      400, // y-axis (pixels from top) - ADJUST THIS
-      {
-        text: donation.donorName,
-        alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
-        alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
-      },
-      800, // max width
-      100  // max height
-    );
+    // 2. Load into Cheerio to manipulate XML
+    const $ = cheerio.load(svgContent, { xmlMode: true });
 
-    // Printing Amount (Green Rectangle Area)
-    image.print(
-      fontAmount, 
-      100, // x-axis
-      600, // y-axis - ADJUST THIS
-      {
-        text: `$${donation.amount.toFixed(2)}`,
-        alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
-        alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
-      },
-      800, // max width
-      100  // max height
-    );
+    // --- HELPER: Function to extract coordinates and insert text ---
+    const insertTextAbovePath = (selector, textContent, fontSize = 24) => {
+      const pathElement = $(selector);
+      
+      if (pathElement.length > 0) {
+        // Get the 'd' attribute (e.g., "M 100 200 L 300 200...")
+        const d = pathElement.attr('d');
+        
+        // Regex to find the starting 'M' coordinates (Move To x y)
+        // Matches "M 150 300" or "M150,300"
+        const match = d.match(/M\s*([\d.]+)[,\s]+([\d.]+)/i);
 
-    // 3. Get Buffer
-    const buffer = await image.getBufferAsync(Jimp.MIME_PNG);
+        if (match) {
+          const x = parseFloat(match[1]);
+          const y = parseFloat(match[2]);
 
-    // 4. Send Email
+          // Create a text element
+          // y - 15 puts it 15 pixels ABOVE the line
+          const textNode = `
+            <text 
+              x="${x}" 
+              y="${y - 15}" 
+              font-family="Arial, sans-serif" 
+              font-size="${fontSize}" 
+              fill="black" 
+              font-weight="bold"
+            >
+              ${textContent}
+            </text>
+          `;
+
+          // Append the text to the SVG
+          $('svg').append(textNode);
+        }
+      }
+    };
+
+    // 3. Insert Data
+    // We assume the paths have classes: .donorName and .donorAmount
+    insertTextAbovePath('.donorName', donation.donorName, 32);
+    insertTextAbovePath('.donorAmount', `$${donation.amount.toFixed(2)}`, 40);
+
+    // 4. Convert the modified XML string to a Buffer
+    const modifiedSvgBuffer = Buffer.from($.xml());
+
+    // 5. Use Sharp to convert SVG Buffer -> PNG Buffer
+    const pngBuffer = await sharp(modifiedSvgBuffer)
+      .png() 
+      .toBuffer();
+
+    // 6. Send Email
     await transporter.sendMail({
       from: `"Student Government" <${process.env.GMAIL_EMAIL}>`,
       to: donation.donorEmail,
@@ -64,10 +86,11 @@ const generateAndEmail = async (donation) => {
       attachments: [
         {
           filename: 'Certificate.png',
-          content: buffer
+          content: pngBuffer
         }
       ]
     });
+
     console.log(`Certificate sent to ${donation.donorEmail}`);
 
   } catch (error) {
